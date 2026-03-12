@@ -1,0 +1,25 @@
+Package: arocAuth
+Title: AROC Shiny Application Authentication Module
+Version: 0.1.0
+Authors@R: person("AROC", "Dev", email = "aroc-enquiries@uow.edu.au", role = c("aut", "cre"))
+Description: Provides token-based authentication, hierarchical access resolution,
+    and a Shiny module for use across AROC Shiny applications. Supports
+    Organisation > Area > Facility hierarchy resolution via vw_orglist,
+    multiple UserTypes, and configurable dataset flag filtering.
+License: MIT + file LICENSE
+Encoding: UTF-8
+Roxygen: list(markdown = TRUE)
+RoxygenNote: 7.3.1
+Imports:
+    shiny (>= 1.7.0),
+    shinyWidgets,
+    shinyalert,
+    dplyr,
+    dbplyr,
+    jsonlite,
+    pool,
+    DBI,
+    rlang
+Suggests:
+    testthat (>= 3.0.0)
+Config/testthat/edition: 3
