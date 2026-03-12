@@ -32,6 +32,21 @@ resolve_hospital_ids <- function(json_data,
       ))
     }
 
+    # Log full payload before any filtering
+    all_user_type_ids <- vapply(
+      parsed$access,
+      function(acc) as.integer(acc$UserTypeId %||% NA_integer_),
+      integer(1)
+    )
+    message(sprintf(
+      "[arocAuth] JSON payload contains %d access entr%s. UserTypeIds found: [%s]. Allowed: [%s]",
+      length(parsed$access),
+      if (length(parsed$access) == 1) "y" else "ies",
+      paste(all_user_type_ids, collapse = ", "),
+      paste(allowed_user_types, collapse = ", ")
+    ))
+    message("[arocAuth] Full JSON payload: ", json_data)
+
     # Filter to allowed UserTypes
     matched_entries <- Filter(
       function(acc) {
