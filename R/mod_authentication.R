@@ -153,6 +153,7 @@ mod_authentication_server <- function(
 
       # Token is valid — resolve access
       message("[arocAuth] Token is valid. Resolving access...")
+      message("[arocAuth] Raw JsonData for user '", uname$UserName[1], "': ", uname$JsonData[1])
 
       result <- resolve_hospital_ids(
         json_data = uname$JsonData[1],
@@ -165,10 +166,9 @@ mod_authentication_server <- function(
         err_msg <- result$error %||% "No valid access found"
         message(sprintf("[arocAuth] Access denied: %s", err_msg))
         shinyalert::shinyalert(
-          "Login Failed",
-          type = "error",
           title = "Access Denied",
           text = "You do not have the required access for this application.",
+          type = "error",
           showCancelButton = FALSE,
           showConfirmButton = FALSE,
           closeOnEsc = FALSE,
