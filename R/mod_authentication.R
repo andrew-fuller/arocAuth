@@ -26,7 +26,9 @@ mod_authentication_ui <- function(id) {
 #'   (contains vw_orglist and _sp_DeleteShinyToken).
 #' @param app_config Named list with:
 #'   \describe{
-#'     \item{allowed_user_types}{Integer vector of permitted UserTypeIds (e.g. c(126L))}
+#'     \item{usertype_flag_col}{Character. Flag column in
+#'       `[web].[vw_arocAuth_Application_UserTypes]` for this app
+#'       (e.g. `"flag_inp_dash"`, `"flag_inr_dash"`). Used to fetch allowed UserTypeIds.}
 #'     \item{orglist_flag_col}{Character. Flag column in vw_orglist to filter by
 #'       (e.g. "Flag_Inpatient", "Flag_Inreach")}
 #'     \item{admin_token}{Character or NULL. Admin bypass token value.
@@ -41,13 +43,19 @@ mod_authentication_server <- function(
   con_ArocOnline,
   con_OnlineReporting,
   app_config = list(
-    allowed_user_types = c(126L),
+    usertype_flag_col  = NULL,
     orglist_flag_col   = "Flag_Inpatient",
     admin_token        = NULL,
     admin_hospital_ids = NULL
   )
 ) {
   shiny::moduleServer(id, function(input, output, session) {
+
+    # Fetch allowed UserTypeIds from DB once at module initialisation
+    allowed_user_types <- fetch_allowed_user_types(
+      app_config$usertype_flag_col,
+      con_ArocOnline
+    )
 
     # Store token for use by deletion observer
     token_info <- shiny::reactiveValues(
@@ -148,7 +156,7 @@ mod_authentication_server <- function(
 
       result <- resolve_hospital_ids(
         json_data = uname$JsonData[1],
-        allowed_user_types = app_config$allowed_user_types,
+        allowed_user_types = allowed_user_types,
         con_reporting = con_OnlineReporting,
         flag_col = app_config$orglist_flag_col
       )
