@@ -43,14 +43,13 @@ mod_authentication_server <- function(
   con_ArocOnline,
   con_OnlineReporting,
   app_config = list(
-    usertype_flag_col  = NULL,
-    orglist_flag_col   = "Flag_Inpatient",
-    admin_token        = NULL,
+    usertype_flag_col = NULL,
+    orglist_flag_col = "Flag_Inpatient",
+    admin_token = NULL,
     admin_hospital_ids = NULL
   )
 ) {
   shiny::moduleServer(id, function(input, output, session) {
-
     # Fetch allowed UserTypeIds from DB once at module initialisation
     allowed_user_types <- fetch_allowed_user_types(
       app_config$usertype_flag_col,
@@ -66,6 +65,7 @@ mod_authentication_server <- function(
     ##* Validate token and populate user_settings --------------------------------
     shiny::observe({
       query <- shiny::parseQueryString(parent_session$clientData$url_search)
+      names(query) <- tolower(names(query))
       message(
         "[arocAuth] Query: ",
         paste(names(query), query, sep = "=", collapse = ", ")
@@ -91,9 +91,11 @@ mod_authentication_server <- function(
 
       # Admin bypass
       admin_token <- app_config$admin_token
-      if (!is.null(admin_token) &&
+      if (
+        !is.null(admin_token) &&
           nchar(admin_token) > 0 &&
-          token_val == admin_token) {
+          token_val == admin_token
+      ) {
         message("[arocAuth] Admin mode activated")
         token_info$is_admin <- TRUE
         user_settings$username <- "AROC_ADMIN"
@@ -153,7 +155,12 @@ mod_authentication_server <- function(
 
       # Token is valid — resolve access
       message("[arocAuth] Token is valid. Resolving access...")
-      message("[arocAuth] Raw JsonData for user '", uname$UserName[1], "': ", uname$JsonData[1])
+      message(
+        "[arocAuth] Raw JsonData for user '",
+        uname$UserName[1],
+        "': ",
+        uname$JsonData[1]
+      )
 
       result <- resolve_hospital_ids(
         json_data = uname$JsonData[1],
@@ -217,7 +224,9 @@ mod_authentication_server <- function(
       }
 
       raw_token <- token_info$raw_token
-      if (is.null(raw_token)) return()
+      if (is.null(raw_token)) {
+        return()
+      }
 
       message("[arocAuth] Starting token cleanup process...")
       delete_token(raw_token, con_OnlineReporting)
