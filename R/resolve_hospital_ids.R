@@ -15,7 +15,7 @@
 #'     \item{hospital_ids}{Integer vector of resolved HospitalIds}
 #'     \item{payer_ids}{Integer vector of payer IDs (if any)}
 #'     \item{error}{NULL on success, or a character error message}
-#'     \item{is_internal}{Logical. TRUE if any access entry has role$category == "I"}
+#'     \item{is_internal}{Logical. TRUE if the top-level category field is "I"}
 #'   }
 #' @export
 

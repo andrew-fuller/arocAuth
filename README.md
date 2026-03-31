@@ -81,7 +81,7 @@ URL: ?token=<TOKEN>
         │
         ▼
   Parse JsonData & check
-  role.category field
+  top-level category field
         │
         ▼
   Category "I"? ─── YES ──> Grant internal/admin access
@@ -110,15 +110,14 @@ Users may hold access at any level in the AROC organisational hierarchy. `resolv
 | `Area`         | Looked up via `vw_orglist` → child HospitalIds     |
 | `Organisation` | Looked up via `vw_orglist` → child HospitalIds     |
 | `Payer`        | Returned separately as `payer_ids`                 |
+| `Internal`     | No resolution needed (admin access via category)   |
 | `Ward`         | Not yet supported                                  |
 
 A single token can contain multiple access entries across different levels. All matching entries are combined and deduplicated.
 
 ### Internal User Detection (Category "I")
 
-Access entries in the JSON payload include a `role.category` field: `"I"` for internal/admin users, `"E"` for external users. When **any** access entry has `category: "I"`, the user is promoted to internal/admin status and granted access to all `admin_hospital_ids` configured in `app_config`. The user's real username (from the token record) is preserved.
-
-Internal detection scans all access entries in the payload, not just those matching the app's allowed `UserTypeId` list. This ensures an internal user is always recognised regardless of which roles they hold.
+The JSON payload includes a top-level `category` field: `"I"` for internal/admin users, `"E"` for external users. When `category` is `"I"`, the user is promoted to internal/admin status and granted access to all `admin_hospital_ids` configured in `app_config`. The user's real username (from the token record) is preserved. Internal users typically have `access_scope.level = "Internal"` with empty entities, as their access is granted via `admin_hospital_ids` rather than the normal hierarchy resolution.
 
 ### Dynamic UserType Filtering
 
