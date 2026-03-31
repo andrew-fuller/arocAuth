@@ -19,13 +19,9 @@
 #'   }
 #' @export
 
-# Internal helper: detect if any access entry has category "I" (internal/admin)
-detect_internal_category <- function(access_list) {
-  any(vapply(
-    access_list,
-    function(acc) identical(acc$role$category, "I"),
-    logical(1)
-  ))
+# Internal helper: detect top-level category "I" (internal/admin)
+detect_internal_category <- function(parsed) {
+  identical(parsed$category, "I")
 }
 
 resolve_hospital_ids <- function(json_data,
@@ -60,7 +56,7 @@ resolve_hospital_ids <- function(json_data,
     message("[arocAuth] Full JSON payload: ", json_data)
 
     # Detect internal (admin) category before UserType filtering
-    is_internal <- detect_internal_category(parsed$access)
+    is_internal <- detect_internal_category(parsed)
     if (is_internal) {
       message("[arocAuth] Internal category ('I') detected - marking as internal user")
     }
@@ -147,6 +143,10 @@ resolve_hospital_ids <- function(json_data,
         },
         "Ward" = {
           message("[arocAuth] Ward-level access not yet supported, skipping")
+          integer(0)
+        },
+        "Internal" = {
+          message("[arocAuth] Internal-level access - no hospital IDs to resolve")
           integer(0)
         },
         {

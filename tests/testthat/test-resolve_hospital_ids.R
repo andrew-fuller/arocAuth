@@ -288,14 +288,14 @@ test_that("Multiple allowed_user_types are all processed", {
   expect_equal(sort(result$hospital_ids), c(1L, 3L))
 })
 
-# --- Test: Category "I" sets is_internal to TRUE ---
-test_that("category 'I' entry sets is_internal to TRUE", {
+# --- Test: Top-level category "I" sets is_internal to TRUE ---
+test_that("top-level category 'I' sets is_internal to TRUE", {
   json <- jsonlite::toJSON(list(
+    category = "I",
     access = list(
       list(
         UserTypeId = 126L,
         role = list(
-          category = "I",
           access_scope = list(
             level = "Facility",
             entities = list(hospital_ids = list(1L))
@@ -311,14 +311,14 @@ test_that("category 'I' entry sets is_internal to TRUE", {
   expect_null(result$error)
 })
 
-# --- Test: Category "E" sets is_internal to FALSE ---
-test_that("category 'E' entry sets is_internal to FALSE", {
+# --- Test: Top-level category "E" sets is_internal to FALSE ---
+test_that("top-level category 'E' sets is_internal to FALSE", {
   json <- jsonlite::toJSON(list(
+    category = "E",
     access = list(
       list(
         UserTypeId = 126L,
         role = list(
-          category = "E",
           access_scope = list(
             level = "Facility",
             entities = list(hospital_ids = list(1L))
@@ -355,34 +355,30 @@ test_that("missing category field defaults is_internal to FALSE", {
   expect_false(result$is_internal)
 })
 
-# --- Test: Mixed "I" and "E" entries — any "I" wins ---
-test_that("mixed 'I' and 'E' entries: any 'I' sets is_internal to TRUE", {
+# --- Test: Category "I" with Internal access level ---
+test_that("category 'I' with Internal access level sets is_internal TRUE", {
   json <- jsonlite::toJSON(list(
+    category = "I",
     access = list(
       list(
-        UserTypeId = 126L,
+        UserTypeId = 107L,
         role = list(
-          category = "E",
           access_scope = list(
-            level = "Facility",
-            entities = list(hospital_ids = list(1L))
-          )
-        )
-      ),
-      list(
-        UserTypeId = 200L,
-        role = list(
-          category = "I",
-          access_scope = list(
-            level = "Facility",
-            entities = list(hospital_ids = list(3L))
+            level = "Internal",
+            entities = list(
+              hospital_ids = list(),
+              payer_ids = list(),
+              organisation_ids = list(),
+              area_ids = list(),
+              ward_ids = list()
+            )
           )
         )
       )
     )
   ), auto_unbox = TRUE)
 
-  result <- resolve_hospital_ids(json, c(126L, 200L), con, "Flag_Inpatient")
+  result <- resolve_hospital_ids(json, c(107L), con, "Flag_Inpatient")
 
   expect_true(result$is_internal)
 })
@@ -390,11 +386,11 @@ test_that("mixed 'I' and 'E' entries: any 'I' sets is_internal to TRUE", {
 # --- Test: Category "I" on non-matching UserTypeId still detected ---
 test_that("category 'I' on non-matching UserTypeId still sets is_internal TRUE", {
   json <- jsonlite::toJSON(list(
+    category = "I",
     access = list(
       list(
         UserTypeId = 999L,
         role = list(
-          category = "I",
           access_scope = list(
             level = "Facility",
             entities = list(hospital_ids = list(99L))
