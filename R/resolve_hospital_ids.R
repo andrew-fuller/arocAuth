@@ -15,8 +15,19 @@
 #'     \item{hospital_ids}{Integer vector of resolved HospitalIds}
 #'     \item{payer_ids}{Integer vector of payer IDs (if any)}
 #'     \item{error}{NULL on success, or a character error message}
+#'     \item{is_internal}{Logical. TRUE if any access entry has role$category == "I"}
 #'   }
 #' @export
+
+# Internal helper: detect if any access entry has category "I" (internal/admin)
+detect_internal_category <- function(access_list) {
+  any(vapply(
+    access_list,
+    function(acc) identical(acc$role$category, "I"),
+    logical(1)
+  ))
+}
+
 resolve_hospital_ids <- function(json_data,
                                  allowed_user_types,
                                  con_reporting,
@@ -28,7 +39,8 @@ resolve_hospital_ids <- function(json_data,
       return(list(
         hospital_ids = integer(0),
         payer_ids = integer(0),
-        error = "JSON missing 'access' array"
+        error = "JSON missing 'access' array",
+        is_internal = FALSE
       ))
     }
 
@@ -47,6 +59,12 @@ resolve_hospital_ids <- function(json_data,
     ))
     message("[arocAuth] Full JSON payload: ", json_data)
 
+    # Detect internal (admin) category before UserType filtering
+    is_internal <- detect_internal_category(parsed$access)
+    if (is_internal) {
+      message("[arocAuth] Internal category ('I') detected - marking as internal user")
+    }
+
     # Filter to allowed UserTypes
     matched_entries <- Filter(
       function(acc) {
@@ -60,7 +78,8 @@ resolve_hospital_ids <- function(json_data,
       return(list(
         hospital_ids = integer(0),
         payer_ids = integer(0),
-        error = "No matching UserTypeIds found in token"
+        error = "No matching UserTypeIds found in token",
+        is_internal = is_internal
       ))
     }
 
@@ -146,20 +165,23 @@ resolve_hospital_ids <- function(json_data,
       return(list(
         hospital_ids = integer(0),
         payer_ids = integer(0),
-        error = "Resolved to zero hospital IDs"
+        error = "Resolved to zero hospital IDs",
+        is_internal = is_internal
       ))
     }
 
     list(
       hospital_ids = all_hospital_ids,
       payer_ids = all_payer_ids,
-      error = NULL
+      error = NULL,
+      is_internal = is_internal
     )
   }, error = function(e) {
     list(
       hospital_ids = integer(0),
       payer_ids = integer(0),
-      error = paste("Resolution error:", e$message)
+      error = paste("Resolution error:", e$message),
+      is_internal = FALSE
     )
   })
 }

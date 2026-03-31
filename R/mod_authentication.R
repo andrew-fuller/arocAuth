@@ -31,9 +31,10 @@ mod_authentication_ui <- function(id) {
 #'       (e.g. `"flag_inp_dash"`, `"flag_inr_dash"`). Used to fetch allowed UserTypeIds.}
 #'     \item{orglist_flag_col}{Character. Flag column in vw_orglist to filter by
 #'       (e.g. "Flag_Inpatient", "Flag_Inreach")}
-#'     \item{admin_token}{Character or NULL. Admin bypass token value.
-#'       Recommended: use Sys.getenv("AROC_ADMIN_TOKEN")}
-#'     \item{admin_hospital_ids}{Integer vector or NULL. HospitalIds granted to admin users.}
+#'     \item{admin_token}{DEPRECATED. No longer used. Admin access is now
+#'       determined by role.category == "I" in the token JSON payload.}
+#'     \item{admin_hospital_ids}{Integer vector or NULL. HospitalIds granted to
+#'       internal (category "I") users. Required if internal users exist.}
 #'   }
 #' @export
 mod_authentication_server <- function(
@@ -89,38 +90,16 @@ mod_authentication_server <- function(
         return()
       }
 
-      # Admin bypass
-      admin_token <- app_config$admin_token
-      if (
-        !is.null(admin_token) &&
-          nchar(admin_token) > 0 &&
-          token_val == admin_token
-      ) {
-        message("[arocAuth] Admin mode activated")
-        token_info$is_admin <- TRUE
-        user_settings$username <- "AROC_ADMIN"
-        user_settings$access_ids <- as.integer(app_config$admin_hospital_ids)
-
-        shinyWidgets::updateSwitchInput(
-          session = parent_session,
-          inputId = "user_loaded",
-          value = TRUE
+      # Deprecation warning for removed admin_token config key
+      if (!is.null(app_config$admin_token) && nchar(app_config$admin_token) > 0) {
+        message(
+          "[arocAuth] DEPRECATED: app_config$admin_token is no longer used. ",
+          "Admin access is now determined by role.category == 'I' in the JSON payload. ",
+          "Remove admin_token from your app_config."
         )
-        print("Admin User Authenticated via Query String")
-
-        shinyalert::shinyalert(
-          paste0("Welcome Admin: ", user_settings$username),
-          type = "success",
-          text = "Login successful",
-          inputId = "intro",
-          className = "intro_modal",
-          showConfirmButton = FALSE,
-          timer = 1500
-        )
-        return()
       }
 
-      # Regular token validation
+      # Token validation
       message("[arocAuth] Starting validation for token...")
       tokenurl <- con_ArocOnline |>
         dplyr::tbl("DataVisToken") |>
@@ -169,7 +148,38 @@ mod_authentication_server <- function(
         flag_col = app_config$orglist_flag_col
       )
 
-      if (!is.null(result$error) || length(result$hospital_ids) == 0) {
+      # Internal user promotion: category "I" found in payload
+      if (isTRUE(result$is_internal)) {
+        message("[arocAuth] Internal user detected: ", uname$UserName[1])
+        token_info$is_admin <- TRUE
+        user_settings$username <- uname$UserName[1]
+        user_settings$access_ids <- as.integer(app_config$admin_hospital_ids)
+
+        if (is.null(app_config$admin_hospital_ids) ||
+            length(app_config$admin_hospital_ids) == 0) {
+          message(
+            "[arocAuth] WARNING: Internal user detected but ",
+            "admin_hospital_ids is NULL/empty in app_config"
+          )
+        }
+
+        shinyWidgets::updateSwitchInput(
+          session = parent_session,
+          inputId = "user_loaded",
+          value = TRUE
+        )
+        message("[arocAuth] Internal (admin) user authenticated: ", uname$UserName[1])
+
+        shinyalert::shinyalert(
+          paste0("Welcome: ", uname$UserName[1]),
+          type = "success",
+          text = "Login successful",
+          inputId = "intro",
+          className = "intro_modal",
+          showConfirmButton = FALSE,
+          timer = 1500
+        )
+      } else if (!is.null(result$error) || length(result$hospital_ids) == 0) {
         err_msg <- result$error %||% "No valid access found"
         message(sprintf("[arocAuth] Access denied: %s", err_msg))
         shinyalert::shinyalert(
@@ -182,47 +192,41 @@ mod_authentication_server <- function(
           closeOnClickOutside = FALSE
         )
         return()
+      } else {
+        # Store resolved access for regular users
+        user_settings$access_ids <- result$hospital_ids
+        if (length(result$payer_ids) > 0) {
+          user_settings$payer_ids <- result$payer_ids
+        }
+
+        message(sprintf(
+          "[arocAuth] Resolved %d hospital ID(s): %s",
+          length(result$hospital_ids),
+          paste(result$hospital_ids, collapse = ", ")
+        ))
+
+        # Flip user_loaded switch
+        shinyWidgets::updateSwitchInput(
+          session = parent_session,
+          inputId = "user_loaded",
+          value = TRUE
+        )
+        message("[arocAuth] Token successful for user: ", uname$UserName[1])
+
+        shinyalert::shinyalert(
+          paste0("Welcome: ", uname$UserName[1]),
+          type = "success",
+          text = "Login successful",
+          inputId = "intro",
+          className = "intro_modal",
+          showConfirmButton = FALSE,
+          timer = 1500
+        )
       }
-
-      # Store resolved access
-      user_settings$access_ids <- result$hospital_ids
-      if (length(result$payer_ids) > 0) {
-        user_settings$payer_ids <- result$payer_ids
-      }
-
-      message(sprintf(
-        "[arocAuth] Resolved %d hospital ID(s): %s",
-        length(result$hospital_ids),
-        paste(result$hospital_ids, collapse = ", ")
-      ))
-
-      # Flip user_loaded switch
-      shinyWidgets::updateSwitchInput(
-        session = parent_session,
-        inputId = "user_loaded",
-        value = TRUE
-      )
-      print("User Authenticated")
-      message("[arocAuth] Token successful for user: ", uname$UserName[1])
-
-      shinyalert::shinyalert(
-        paste0("Welcome: ", uname$UserName[1]),
-        type = "success",
-        text = "Login successful",
-        inputId = "intro",
-        className = "intro_modal",
-        showConfirmButton = FALSE,
-        timer = 1500
-      )
     })
 
     ##* Clear token for the session -----------------------------------------------
     shiny::observe({
-      if (token_info$is_admin) {
-        message("[arocAuth] Admin mode - skipping token clearing")
-        return()
-      }
-
       raw_token <- token_info$raw_token
       if (is.null(raw_token)) {
         return()
