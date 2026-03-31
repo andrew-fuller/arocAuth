@@ -50,7 +50,6 @@ server <- function(input, output, session) {
     app_config = list(
       usertype_flag_col  = "flag_inp_dash",
       orglist_flag_col   = "Flag_Inpatient",
-      admin_token        = Sys.getenv("AROC_ADMIN_TOKEN"),
       admin_hospital_ids = c(1L, 2L, 3L)
     )
   )
@@ -70,11 +69,6 @@ URL: ?token=<TOKEN>
   Parse query string
         │
         ▼
-  Admin token? ─── YES ──> Grant full access
-        │                   (admin_hospital_ids)
-        NO
-        │
-        ▼
   Fetch DataVisToken table
   from ArocOnline DB
         │
@@ -86,8 +80,17 @@ URL: ?token=<TOKEN>
   from vw_arocAuth_Application_UserTypes
         │
         ▼
-  Parse JsonData & resolve
-  hierarchical access to HospitalIds
+  Parse JsonData & check
+  role.category field
+        │
+        ▼
+  Category "I"? ─── YES ──> Grant internal/admin access
+        │                    (admin_hospital_ids)
+        NO
+        │
+        ▼
+  Resolve hierarchical access
+  to HospitalIds
         │
         ▼
   Populate user_settings
@@ -110,6 +113,12 @@ Users may hold access at any level in the AROC organisational hierarchy. `resolv
 | `Ward`         | Not yet supported                                  |
 
 A single token can contain multiple access entries across different levels. All matching entries are combined and deduplicated.
+
+### Internal User Detection (Category "I")
+
+Access entries in the JSON payload include a `role.category` field: `"I"` for internal/admin users, `"E"` for external users. When **any** access entry has `category: "I"`, the user is promoted to internal/admin status and granted access to all `admin_hospital_ids` configured in `app_config`. The user's real username (from the token record) is preserved.
+
+Internal detection scans all access entries in the payload, not just those matching the app's allowed `UserTypeId` list. This ensures an internal user is always recognised regardless of which roles they hold.
 
 ### Dynamic UserType Filtering
 
@@ -137,7 +146,7 @@ Shiny module pair. The UI is an empty placeholder — authentication operates en
 
 ### `resolve_hospital_ids(json_data, allowed_user_types, con_reporting, flag_col)`
 
-Parses a DataVisToken JSON payload and resolves access entries to HospitalIds. Returns a list with `hospital_ids`, `payer_ids`, and `error` fields.
+Parses a DataVisToken JSON payload and resolves access entries to HospitalIds. Returns a list with `hospital_ids`, `payer_ids`, `error`, and `is_internal` fields.
 
 ### `fetch_allowed_user_types(usertype_flag_col, con_aroc_online)`
 
@@ -155,8 +164,7 @@ The `app_config` list passed to `mod_authentication_server()`:
 |----------------------|------------------|--------------------------------------------------------------------|
 | `usertype_flag_col`  | Character        | Flag column in `vw_arocAuth_Application_UserTypes` for this app    |
 | `orglist_flag_col`   | Character        | Flag column in `vw_orglist` to filter facilities (default: `"Flag_Inpatient"`) |
-| `admin_token`        | Character / NULL | Admin bypass token value (recommended: `Sys.getenv(...)`)          |
-| `admin_hospital_ids` | Integer vector   | HospitalIds granted when admin token is used                       |
+| `admin_hospital_ids` | Integer vector   | HospitalIds granted to internal (category `"I"`) users             |
 
 ## Database Dependencies
 
@@ -173,7 +181,7 @@ After successful authentication, `user_settings` contains:
 
 | Field        | Type             | Description                                |
 |--------------|------------------|--------------------------------------------|
-| `username`   | Character        | Username from token record or `"AROC_ADMIN"` |
+| `username`   | Character        | Username from the token record               |
 | `access_ids` | Integer vector   | Resolved HospitalIds the user can access   |
 | `payer_ids`  | Integer vector   | Payer IDs (if payer-level access exists)    |
 
@@ -184,9 +192,7 @@ The consuming application is responsible for using `access_ids` to filter data (
 1. An external system inserts a token into `DataVisToken` with the user's access JSON.
 2. The user is redirected to the app with `?token=<TOKEN>`.
 3. arocAuth validates the token and resolves access.
-4. The token is deleted via `_sp_DeleteShinyToken` — tokens are **single-use**.
-
-Admin tokens are a keyword match and are not deleted.
+4. The token is deleted via `_sp_DeleteShinyToken` — **all** tokens are single-use, including internal/admin users.
 
 ## License
 
