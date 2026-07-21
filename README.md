@@ -24,6 +24,8 @@ renv::install("git@gitlab.uow.edu.au:aroc/r-shiny-applications/aroc-auth.git")
 
 > **Note:** You must have access to the [AROC GitLab](https://gitlab.uow.edu.au/aroc/r-shiny-applications/aroc-auth) repository. Configure a GitLab personal access token or SSH key if prompted for authentication.
 
+**Canonical remote:** UOW GitLab. A push mirror keeps [GitHub](https://github.com/andrew-fuller/arocAuth) in sync automatically — work and push against GitLab only.
+
 ## Quick Start
 
 ```r
