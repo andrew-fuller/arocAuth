@@ -138,7 +138,7 @@ resolve_hospital_ids <- function(json_data,
         },
         "Payer" = {
           payer_ids <- as.integer(unlist(entities$payer_ids))
-          all_payer_ids <<- c(all_payer_ids, payer_ids)
+          all_payer_ids <- c(all_payer_ids, payer_ids)
           integer(0) # Payer does not resolve to HospitalIds
         },
         "Ward" = {
